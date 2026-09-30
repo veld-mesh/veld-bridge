@@ -46,9 +46,9 @@ hold 3 s ─► ThinkNode SOS radio ~~LoRa mesh~~ gateway ─► veld-bridge ─
 <p align="center">
   <img src="docs/images/sos-press.gif" alt="Holding the SOS button on a ThinkNode M3; the red light shows it's armed" width="320">
   &nbsp;
-  <img src="docs/images/admin-sos.png" alt="Admin page: choosing who gets SOS alerts on WhatsApp" width="300">
+  <img src="docs/images/wa-sos-alert.png" alt="A family WhatsApp chat: the SOS alert with a map link arrives between everyday messages, then the cancel a minute later" width="300">
 </p>
-<p align="center"><sub>Holding the SOS button on a ThinkNode M3 (left). Picking who gets the WhatsApp alert on the admin page (right, demo data).</sub></p>
+<p align="center"><sub>Hold the button (left), and the SOS lands in the family's normal WhatsApp chat, right after "Come have lunch pls" (right). The name, photo and coordinates are blurred.</sub></p>
 
 1. **Someone in the field holds the button** on a ThinkNode M3 running
    [ThinkNode SOS](https://github.com/veld-mesh/thinknode-sos) for 3 seconds. The beeps
@@ -59,6 +59,8 @@ hold 3 s ─► ThinkNode SOS radio ~~LoRa mesh~~ gateway ─► veld-bridge ─
    2 minutes. Other SOS radios sound a loud alarm.
 3. **veld-bridge WhatsApps the people you chose.** Tick them under **🆘 SOS alerts** on the
    [admin page](#admin-page). They can be people or whole groups, and nobody needs a radio or an app:
+
+   <img src="docs/images/admin-sos.png" alt="Admin page: choosing who gets SOS alerts on WhatsApp (demo data)" width="300">
 
    > 🆘 **Mesh SOS alert** (14:05)
    > SOS Bert! -30.12345,25.12345 https://maps.google.com/?q=-30.12345,25.12345
