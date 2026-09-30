@@ -20,6 +20,13 @@ LoRa radio carries your messages out into the field:
 - **Knows when you're on your phone.** Read or send a WhatsApp on your phone and the
   bridge stops duplicating messages to the radio until you've been off it for 30 min.
 
+<p align="center">
+  <img src="docs/images/m1-in-hand.jpg" alt="A ThinkNode M1 pocket radio showing WhatsApp replies relayed over the mesh" width="300">
+  &nbsp;
+  <img src="docs/images/bridge-reply.png" alt="Replying to a WhatsApp from the Meshtastic app: the bridge confirms with a tick and the answers come back" width="300">
+</p>
+<p align="center"><sub>WhatsApp replies arriving on a pocket radio in the field (left), and the same chat in the Meshtastic app (right). Names are blurred for privacy.</sub></p>
+
 Beyond emergencies it's handy every day: farm-watch patrols, coordinating work, or
 getting everyone together for a braai after work.
 
@@ -35,6 +42,13 @@ WhatsApp ── wa/ (Node, whatsapp-web.js) ──unix socket── core/ (Pytho
 ```
 hold 3 s ─► ThinkNode SOS radio ~~LoRa mesh~~ gateway ─► veld-bridge ─► WhatsApp: family, farm-watch group…
 ```
+
+<p align="center">
+  <img src="docs/images/sos-press.gif" alt="Holding the SOS button on a ThinkNode M3; the red light shows it's armed" width="320">
+  &nbsp;
+  <img src="docs/images/admin-sos.png" alt="Admin page: choosing who gets SOS alerts on WhatsApp" width="300">
+</p>
+<p align="center"><sub>Holding the SOS button on a ThinkNode M3 (left). Picking who gets the WhatsApp alert on the admin page (right, demo data).</sub></p>
 
 1. **Someone in the field holds the button** on a ThinkNode M3 running
    [ThinkNode SOS](https://github.com/veld-mesh/thinknode-sos) for 3 seconds. The beeps
@@ -105,6 +119,8 @@ DM these to the gateway node from your pocket node:
 | `ping` | `pong rssi -97 snr 6.5` (range test) |
 | `pause` / `resume` | stop sending new WhatsApps to the node / start again (`▶ resumed, 3 waiting`) |
 
+<img src="docs/images/bridge-ping.png" alt="ping from the pocket node answered with pong rssi and snr, then a relayed WhatsApp" width="420">
+
 Incoming messages look like `#3 Sam: see you at 5`. Media shows as `[photo] caption`,
 `[voice 0:42]`, `[pdf: name]` or `[loc] lat,lon`. A long message is cut off with `…`.
 Send `r 3` to get all of it.
@@ -141,6 +157,8 @@ and nothing older than `relay.max_age_s` (6 h).
 
 ## Admin page
 
+<img src="docs/images/admin-status.png" alt="Admin page: status and relay settings" width="360" align="right">
+
 `http://<host>:8787/` on your LAN. Any username works, and the password is
 `health.admin_password`. From the page you can:
 
@@ -153,6 +171,7 @@ and nothing older than `relay.max_age_s` (6 h).
 The page never shows message text. `/health` on the same port returns JSON for
 monitoring. **Never port-forward port 8787 to the internet.** For remote access, use a VPN such
 as Tailscale or WireGuard.
+<br clear="right">
 
 ## Install with Docker (NAS or any Docker host)
 
