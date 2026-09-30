@@ -1,0 +1,4 @@
+# Everything here runs on Linux (NAS containers, Pi). Keep LF in every
+# checkout, including Windows with core.autocrlf=true, or sh/Docker break.
+* text=auto eol=lf
+*.png binary

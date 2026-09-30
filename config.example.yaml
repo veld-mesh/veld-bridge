@@ -1,0 +1,45 @@
+# Copy to /etc/veld-bridge/config.yaml and edit. Unknown keys are rejected.
+
+mesh:
+  # From `ls -l /dev/serial/by-id/` on the Pi (never /dev/ttyUSB0).
+  serial_path: /dev/serial/by-id/REPLACE-ME
+  # Your pocket node (e.g. a ThinkNode-M1), from `meshtastic --nodes` ("User" column id, e.g. !a1b2c3d4).
+  pocket_node: "!00000000"
+  byte_budget: 200            # bytes UTF-8 per packet, prefix included
+  min_packet_interval_s: 10   # airtime: at most one packet per 10 s
+  ack_timeout_s: 60
+  retry_schedule_s: [60, 180, 600]   # then park in the queue
+  reachable_window_s: 600     # heard from pocket node within 10 min = reachable
+  probe_interval_s: 300       # with a queue and node away, probe at most every 5 min
+  flush_cap: 10               # after coming back: deliver up to 10, then "+N more"
+  silence_reconnect_s: 1800   # no packets from the gateway this long = serial fault
+
+relay:
+  all: true                   # every 1:1 chat. `all off` from the mesh = allowlist only
+  allowlist: []               # favourites (@name works before they write) + groups to relay
+  #  - chat_id: "1203630xxxxxxxxx@g.us"
+  #    name: Farm
+  muted: []                   # chat ids never relayed
+  mark_seen: ack              # ack | read | never (phone marks read when back in signal)
+  max_age_s: 21600            # never relay history older than 6 h (or sent before the first link)
+  phone_pause_s: 1800        # read/sent a WhatsApp on the phone: hold the mesh relay 30 min (0 = off)
+
+whatsapp:
+  socket_path: /run/veld-bridge/wa.sock
+  min_send_interval_s: 3
+  signature: null             # e.g. " -L (via mesh)"
+
+transcription:
+  backend: none               # voice notes go out as [voice 0:42]
+
+health:
+  host: 0.0.0.0               # LAN only; nothing is forwarded from the internet
+  port: 8787
+  # Admin page at http://<host>:8787/ (any username, this password). Unset = no page.
+  # Once you change favourites/groups/mutes/ticks there, the page's values win over
+  # relay.* above (they live in bridge.db).
+  admin_password: null
+
+db_path: /var/lib/veld-bridge/bridge.db
+timezone: Africa/Johannesburg
+log_level: INFO

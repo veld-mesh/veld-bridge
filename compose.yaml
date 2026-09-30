@@ -1,0 +1,41 @@
+# Synology Container Manager project: Project → Create → path = this repo on the NAS.
+# Host folders (create once):  /volume1/docker/veld-bridge/{config,state,run}
+#   config/config.yaml  <- from config.example.yaml
+#   config/wa.env       <- from deploy/wa.env.example
+name: veld-bridge
+
+x-common: &common
+  restart: unless-stopped
+  environment:
+    TZ: Africa/Johannesburg
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+services:
+  core:
+    <<: *common
+    build: ./core
+    volumes:
+      - /volume1/docker/veld-bridge/config:/etc/veld-bridge:ro
+      - /volume1/docker/veld-bridge/state:/var/lib/veld-bridge
+      - /volume1/docker/veld-bridge/run:/run/veld-bridge
+    devices:
+      # T-Beam. Set VB_MESH_DEV in a .env file next to this compose file, e.g.
+      # VB_MESH_DEV=/dev/ttyUSB0 (DSM has no /dev/serial/by-id; see deploy/nas/usb-check.sh).
+      # config.yaml mesh.serial_path must then be /dev/ttyMESH.
+      - ${VB_MESH_DEV:-/dev/null}:/dev/ttyMESH
+    ports:
+      - "8787:8787"   # /health, LAN only; do not forward on the router
+
+  wa:
+    <<: *common
+    build: ./wa
+    init: true          # reaps Chromium zombies
+    depends_on: [core]
+    env_file: /volume1/docker/veld-bridge/config/wa.env
+    shm_size: "512m"    # Chromium needs more than Docker's 64 MB /dev/shm
+    mem_limit: 2500m    # Chromium sat at 1.3 GB after linking (on a 12 GB NAS)
+    volumes:
+      - /volume1/docker/veld-bridge/state:/var/lib/veld-bridge
+      - /volume1/docker/veld-bridge/run:/run/veld-bridge

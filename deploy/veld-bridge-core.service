@@ -1,0 +1,25 @@
+[Unit]
+Description=veld-bridge bridge core (mesh, queue, commands)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pi
+Group=pi
+SupplementaryGroups=dialout
+# /run/veld-bridge holds wa.sock; core creates it, wa connects.
+RuntimeDirectory=veld-bridge
+RuntimeDirectoryMode=0750
+RuntimeDirectoryPreserve=yes
+StateDirectory=veld-bridge
+StateDirectoryMode=0700
+ExecStart=/opt/veld-bridge/venv/bin/veldbridge --config /etc/veld-bridge/config.yaml
+Restart=always
+RestartSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/veld-bridge /run/veld-bridge
+
+[Install]
+WantedBy=multi-user.target

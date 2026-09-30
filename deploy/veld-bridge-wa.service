@@ -1,0 +1,27 @@
+[Unit]
+Description=veld-bridge bridge WhatsApp adapter (whatsapp-web.js)
+After=veld-bridge-core.service network-online.target
+Wants=veld-bridge-core.service network-online.target
+
+[Service]
+User=pi
+Group=pi
+EnvironmentFile=/etc/veld-bridge/wa.env
+# Chromium wants a writable HOME for its profile bits.
+Environment=HOME=/var/lib/veld-bridge
+WorkingDirectory=/opt/veld-bridge/app/wa
+ExecStart=/usr/bin/node src/index.js
+Restart=always
+RestartSec=10
+# Chromium is a child of node: kill the whole group on stop/restart, no zombies.
+KillMode=control-group
+TimeoutStopSec=20
+MemoryHigh=900M
+MemoryMax=1200M
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/veld-bridge /run/veld-bridge /tmp
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mesh WhatsApp</title>
+<style>
+  :root {
+    --bg: #f4f5f2; --card: #ffffff; --ink: #1d231f; --muted: #66706a; --line: #dfe3dd;
+    --accent: #1f7a52; --accent-ink: #ffffff; --ok: #1f7a52; --warn: #b7791f; --bad: #c0392b;
+    --chip: #eef1ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121614; --card: #1b201d; --ink: #e7ebe8; --muted: #9aa49e; --line: #2c332f;
+      --accent: #3fae7a; --accent-ink: #0d1510; --ok: #3fae7a; --warn: #e0a33a; --bad: #e0625a;
+      --chip: #242b27;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px 16px 48px; }
+  h1 { font-size: 1.35rem; margin: 4px 0 12px; }
+  h2 { font-size: 1rem; margin: 0 0 10px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+          padding: 14px 16px; margin-bottom: 14px; }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; background: var(--card);
+          border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: .9rem; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); } .dot.bad { background: var(--bad); }
+  .row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+  .row:first-child { border-top: 0; }
+  .grow { flex: 1; min-width: 0; }
+  .name { overflow-wrap: anywhere; }
+  .sub { color: var(--muted); font-size: .85rem; }
+  .tag { background: var(--chip); color: var(--muted); border-radius: 6px; padding: 1px 7px;
+         font-size: .75rem; margin-left: 6px; white-space: nowrap; }
+  button { font: inherit; font-size: .9rem; border-radius: 8px; padding: 6px 12px; cursor: pointer;
+           border: 1px solid var(--line); background: var(--card); color: var(--ink); white-space: nowrap; }
+  button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  input[type=search], select { font: inherit; width: 100%; padding: 10px 12px; border-radius: 8px;
+           border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+  label.switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; }
+  .setting { padding: 8px 0; }
+  .setting + .setting { border-top: 1px solid var(--line); }
+  .hint { color: var(--muted); font-size: .85rem; margin: 4px 0 0; }
+  .empty { color: var(--muted); font-size: .9rem; padding: 4px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  th, td { text-align: left; padding: 6px 6px 6px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; border-top: 0; }
+  .scroll { overflow-x: auto; }
+  #toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--ink);
+           color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: .9rem; opacity: 0;
+           transition: opacity .2s; pointer-events: none; max-width: calc(100% - 32px); }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Mesh WhatsApp</h1>
+  <div class="pills" id="pills"></div>
+
+  <section class="card" id="link" hidden>
+    <h2>Link WhatsApp</h2>
+    <p id="linkText" class="hint"></p>
+    <div id="qrBox" hidden>
+      <img id="qr" alt="WhatsApp link QR code" width="260" height="260"
+           style="display:block;background:#fff;padding:10px;border-radius:8px;margin:10px 0">
+      <ol class="hint" style="padding-left:18px">
+        <li>On your phone: WhatsApp → Settings → Linked devices → Link a device.</li>
+        <li>Scan this code. It changes every ~20 s; this page keeps it fresh.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Relay</h2>
+    <div class="setting">
+      <label class="switch">
+        <span>Relay every one-to-one chat<br>
+          <span class="hint">Off: only favourites and the groups below reach the mesh.</span></span>
+        <button id="relayAll" type="button">…</button>
+      </label>
+    </div>
+    <div class="setting">
+      <label class="switch">
+        <span>Pause while I'm on my phone<br>
+          <span class="hint">Reading or sending a WhatsApp on your phone holds the mesh relay for 30 min.</span></span>
+        <button id="phonePause" type="button">…</button>
+      </label>
+    </div>
+    <div class="setting">
+      <label class="switch">
+        <span>Paused now<br>
+          <span class="hint">Nothing new goes to the mesh until you resume, here or with <b>resume</b> from your node.</span></span>
+        <button id="paused" type="button">…</button>
+      </label>
+    </div>
+    <div class="setting">
+      <label class="switch">
+        <span>Alert me on the mesh when WhatsApp stops working<br>
+          <span class="hint">One message if the link is removed or expires, or WhatsApp is down 10 min; one when it's back.</span></span>
+        <button id="waAlerts" type="button">…</button>
+      </label>
+    </div>
+    <div class="setting">
+      <label for="markSeen">Blue ticks</label>
+      <select id="markSeen">
+        <option value="never">Never — chats stay unread for my phone</option>
+        <option value="ack">When my node receives the message</option>
+        <option value="read">Only when I open it with r</option>
+      </select>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>🆘 SOS alerts</h2>
+    <p class="hint">When an SOS button on the mesh is held, these get a WhatsApp from you with the
+      map link, an update every 10 min, and a message when it's cancelled. Search below and tap 🆘.</p>
+    <div id="sos"></div>
+  </section>
+
+  <section class="card">
+    <h2>Find a contact or group</h2>
+    <input type="search" id="q" placeholder="Type a name, e.g. thabo or family" autocomplete="off">
+    <div id="results"></div>
+  </section>
+
+  <section class="card">
+    <h2>Favourites</h2>
+    <p class="hint">You can start a chat with these from the mesh with @name, even if they haven't written.</p>
+    <div id="favourites"></div>
+  </section>
+
+  <section class="card">
+    <h2>Groups relayed to the mesh</h2>
+    <p class="hint">Messages arrive as #5 Sam/Group. Busy groups use airtime.</p>
+    <div id="groups"></div>
+  </section>
+
+  <section class="card">
+    <h2>Muted</h2>
+    <div id="muted"></div>
+  </section>
+
+  <section class="card">
+    <h2>Recent messages</h2>
+    <div class="scroll"><table id="recent"></table></div>
+    <h2 style="margin-top:14px">Recent replies</h2>
+    <div class="scroll"><table id="outbound"></table></div>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+let state = null;
+
+function el(tag, attrs = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") e.className = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v);
+  }
+  for (const k of kids) if (k != null) e.append(k);   // strings become text nodes
+  return e;
+}
+
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => t.classList.remove("show"), 2500);
+}
+
+async function api(path, body) {
+  const opts = body === undefined ? {} : {
+    method: "POST", body: JSON.stringify(body),
+    headers: { "Content-Type": "application/json", "X-VB-Admin": "1" },
+  };
+  const r = await fetch(path, opts);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || r.status);
+  return data;
+}
+
+async function act(path, body, msg) {
+  try {
+    render(await api(path, body));
+    toast(msg);
+    if ($("q").value.trim().length >= 2) search();
+  } catch (e) {
+    toast("Didn't work: " + e.message);
+  }
+}
+
+function ago(s) {
+  if (s == null) return "never";
+  if (s < 90) return s + " s ago";
+  if (s < 5400) return Math.round(s / 60) + " min ago";
+  return Math.round(s / 3600) + " h ago";
+}
+
+function time(ts) {
+  return new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function pill(level, text) {
+  return el("span", { class: "pill" }, el("span", { class: "dot " + level }), text);
+}
+
+function renderPills(h) {
+  const wa = h.wa === "CONNECTED" ? pill("ok", "WhatsApp connected")
+    : h.wa === "QR" ? pill("warn", "WhatsApp needs QR scan") : pill("bad", "WhatsApp " + h.wa.toLowerCase());
+  const mesh = pill(h.mesh_connected ? "ok" : "bad", h.mesh_connected ? "T-Beam connected" : "T-Beam offline");
+  const node = pill(h.pocket_reachable ? "ok" : "warn",
+    "Your node: " + (h.pocket_reachable ? "heard " : "last heard ") + ago(h.pocket_last_heard_s));
+  const q = pill(h.queue ? "warn" : "ok", h.queue + " waiting");
+  const pills = [wa, mesh, node, q];
+  if (h.paused) pills.push(pill("warn", h.paused === "manual" ? "Mesh relay paused" : "Paused: you're on your phone"));
+  $("pills").replaceChildren(...pills);
+}
+
+function list(id, items, button, empty) {
+  const rows = items.map((it) => el("div", { class: "row" },
+    el("div", { class: "grow name" }, it.name), button(it)));
+  $(id).replaceChildren(...(rows.length ? rows : [el("div", { class: "empty" }, empty)]));
+}
+
+function renderLink(s) {
+  const wa = s.health.wa;
+  $("link").hidden = wa === "CONNECTED";
+  $("qrBox").hidden = !s.qr;
+  if (s.qr) {
+    $("linkText").textContent = "WhatsApp is not linked. Scan the code below with your phone.";
+    $("qr").src = "/api/qr.png?t=" + Date.now();
+  } else if (wa === "AUTH_FAILURE") {
+    $("linkText").textContent = "WhatsApp rejected the saved link. A new QR code will appear here shortly.";
+  } else {
+    $("linkText").textContent = "WhatsApp is reconnecting. If it needs a new link, the QR code appears here.";
+  }
+}
+
+function render(s) {
+  state = s;
+  renderPills(s.health);
+  renderLink(s);
+  const ra = $("relayAll");
+  ra.textContent = s.relay_all ? "On" : "Off";
+  ra.className = s.relay_all ? "on" : "";
+  $("markSeen").value = s.mark_seen;
+  const wa = $("waAlerts");
+  wa.textContent = s.wa_alerts ? "On" : "Off";
+  wa.className = s.wa_alerts ? "on" : "";
+  const pp = $("phonePause");
+  pp.textContent = s.phone_pause ? (s.phone_pause_left_s ? "On · " + Math.ceil(s.phone_pause_left_s / 60) + " min" : "On") : "Off";
+  pp.className = s.phone_pause ? "on" : "";
+  const pz = $("paused");
+  pz.textContent = s.paused === "manual" ? "Paused" : "Relaying";
+  pz.className = s.paused === "manual" ? "on" : "";
+
+  list("favourites", s.favourites, (it) => el("button", { type: "button",
+    onclick: () => act("/api/favourite", { chat_id: it.chat_id, on: false }, "Removed " + it.name) }, "Remove"),
+    "No favourites yet. Search above and tap ★.");
+  list("groups", s.groups, (it) => el("button", { type: "button",
+    onclick: () => act("/api/favourite", { chat_id: it.chat_id, on: false }, "Stopped relaying " + it.name) }, "Stop"),
+    "No groups are relayed.");
+  list("sos", s.sos, (it) => el("button", { type: "button",
+    onclick: () => act("/api/sos", { chat_id: it.chat_id, on: false }, "No SOS alerts for " + it.name) }, "Remove"),
+    "Nobody gets SOS alerts yet. Search below and tap 🆘.");
+  list("muted", s.muted, (it) => el("button", { type: "button",
+    onclick: () => act("/api/mute", { chat_id: it.chat_id, on: false }, "Unmuted " + it.name) }, "Unmute"),
+    "Nobody is muted.");
+
+  const head = (...c) => el("tr", {}, ...c.map((x) => el("th", {}, x)));
+  $("recent").replaceChildren(head("#", "From", "Kind", "Status", "Time"),
+    ...s.recent.map((m) => el("tr", {}, el("td", {}, "#" + m.short_id), el("td", { class: "name" }, m.sender_name),
+      el("td", {}, m.media_kind || "text"), el("td", {}, m.state), el("td", {}, time(m.received_at)))));
+  $("outbound").replaceChildren(head("To", "Status", "Time"),
+    ...s.outbound.map((o) => el("tr", {}, el("td", { class: "name" }, o.chat_name),
+      el("td", {}, o.state + (o.last_error ? " — " + o.last_error : "")), el("td", {}, time(o.created_at)))));
+}
+
+async function search() {
+  const q = $("q").value.trim();
+  if (q.length < 2) { $("results").replaceChildren(); return; }
+  let hits;
+  try { hits = await api("/api/search?q=" + encodeURIComponent(q)); } catch (e) { return; }
+  if (q !== $("q").value.trim()) return;   // a newer search is on its way
+  const rows = hits.map((c) => {
+    const fav = el("button", { type: "button", class: c.allowed ? "on" : "",
+      onclick: () => act("/api/favourite", { chat_id: c.chat_id, on: !c.allowed },
+        c.allowed ? "Removed " + c.name : (c.is_group ? "Relaying " : "Favourite: ") + c.name) },
+      c.is_group ? (c.allowed ? "Relayed" : "Relay") : (c.allowed ? "★ Favourite" : "☆ Favourite"));
+    const mute = el("button", { type: "button", class: c.muted ? "on" : "",
+      onclick: () => act("/api/mute", { chat_id: c.chat_id, on: !c.muted },
+        (c.muted ? "Unmuted " : "Muted ") + c.name) }, c.muted ? "Muted" : "Mute");
+    const sos = el("button", { type: "button", class: c.sos ? "on" : "", title: "WhatsApp them when a mesh SOS comes in",
+      onclick: () => act("/api/sos", { chat_id: c.chat_id, on: !c.sos },
+        (c.sos ? "No SOS alerts for " : "SOS alerts to ") + c.name) }, c.sos ? "🆘 On" : "🆘");
+    const tag = c.is_group ? "group" : c.saved ? null : "not saved";
+    return el("div", { class: "row" },
+      el("div", { class: "grow name" }, c.name, tag ? el("span", { class: "tag" }, tag) : null), fav, mute, sos);
+  });
+  $("results").replaceChildren(...(rows.length ? rows : [el("div", { class: "empty" }, "No match.")]));
+}
+
+let timer;
+$("q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(search, 250); });
+$("relayAll").addEventListener("click", () =>
+  act("/api/settings", { relay_all: !state.relay_all }, state.relay_all ? "Relay all: off" : "Relay all: on"));
+$("waAlerts").addEventListener("click", () =>
+  act("/api/settings", { wa_alerts: !state.wa_alerts }, state.wa_alerts ? "Alerts off" : "Alerts on"));
+$("phonePause").addEventListener("click", () =>
+  act("/api/settings", { phone_pause: !state.phone_pause }, state.phone_pause ? "Phone pause off" : "Phone pause on"));
+$("paused").addEventListener("click", () =>
+  act("/api/settings", { paused: state.paused !== "manual" }, state.paused === "manual" ? "Resumed" : "Paused"));
+$("markSeen").addEventListener("change", (e) =>
+  act("/api/settings", { mark_seen: e.target.value }, "Blue ticks updated"));
+
+async function refresh() {
+  try { render(await api("/api/state")); } catch (e) { toast("Can't reach the bridge"); }
+}
+// Every 15 s normally; every 5 s while WhatsApp is not connected, to keep the QR fresh.
+async function loop() {
+  await refresh();
+  setTimeout(loop, state && state.health.wa !== "CONNECTED" ? 5000 : 15000);
+}
+loop();
+</script>
+</body>
+</html>

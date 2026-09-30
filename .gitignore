@@ -1,0 +1,23 @@
+# WhatsApp session data must never be committed
+.wwebjs_auth/
+.wwebjs_cache/
+session/
+qr.png
+
+# Local config and state
+config.yaml
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Python
+__pycache__/
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+.env
