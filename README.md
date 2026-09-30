@@ -12,10 +12,11 @@ LoRa radio carries your messages out into the field:
   short form (`#3 Sam: see you at 5`). You reply with `@3 on my way`, and it lands in the
   right chat as you. When you're back in signal, your phone shows a normal, consistent
   chat history.
-- **SOS to WhatsApp.** When someone holds the SOS button on a
-  [ThinkNode SOS](https://github.com/veld-mesh/thinknode-sos) radio, the people and groups
-  you choose get a WhatsApp alert with a map link. They get location updates every 10 min
-  and a message when it's cancelled. Nobody on the receiving end needs a radio or an app.
+- **[SOS to WhatsApp](#-sos-a-panic-button-that-reaches-whatsapp).** When someone holds
+  the SOS button on a [ThinkNode SOS](https://github.com/veld-mesh/thinknode-sos) radio,
+  the people and groups you choose get a WhatsApp alert with a map link. They get location
+  updates every 10 min and a message when it's cancelled. Nobody on the receiving end
+  needs a radio or an app.
 - **Knows when you're on your phone.** Read or send a WhatsApp on your phone and the
   bridge stops duplicating messages to the radio until you've been off it for 30 min.
 
@@ -28,6 +29,38 @@ getting everyone together for a braai after work.
 ```
 WhatsApp ── wa/ (Node, whatsapp-web.js) ──unix socket── core/ (Python) ── T-Beam ~~LoRa~~ pocket node
 ```
+
+## 🆘 SOS: a panic button that reaches WhatsApp
+
+```
+hold 3 s ─► ThinkNode SOS radio ~~LoRa mesh~~ gateway ─► veld-bridge ─► WhatsApp: family, farm-watch group…
+```
+
+1. **Someone in the field holds the button** on a ThinkNode M3 running
+   [ThinkNode SOS](https://github.com/veld-mesh/thinknode-sos) for 3 seconds. The beeps
+   speed up, then a loud tone confirms it. Letting go early sends nothing, so a bump
+   doesn't set it off.
+2. **The radio alerts the mesh.** It sends `🆘 SOS Bert! -30.12345,25.12345 <maps link>` on
+   your channel and drops a 🆘 pin on everyone's Meshtastic map. It repeats every
+   2 minutes. Other SOS radios sound a loud alarm.
+3. **veld-bridge WhatsApps the people you chose.** Tick them under **🆘 SOS alerts** on the
+   [admin page](#admin-page). They can be people or whole groups, and nobody needs a radio or an app:
+
+   > 🆘 **Mesh SOS alert** (14:05)
+   > SOS Bert! -30.12345,25.12345 https://maps.google.com/?q=-30.12345,25.12345
+   >
+   > Automatic message from the farm radio mesh. Location updates follow every 10 min until it's cancelled.
+
+4. **Updates and cancel.** Updated locations go out at most every 10 min. Holding the button
+   for 3 s again cancels the SOS: the pin disappears and everyone gets `✅ Mesh SOS cancelled`.
+
+**Details:**
+
+- An SOS from **any** node on your channel counts, not just yours.
+- Only WhatsApp contacts and groups can be picked, so the bridge never messages a stranger.
+- Each WhatsApp sent is confirmed on your pocket node as `✓ SOS Thabo`.
+- If nobody is ticked, your node gets `⚠ SOS heard, no WhatsApp SOS recipients set`.
+- If WhatsApp is offline, alerts are queued and sent when it's back.
 
 ## ⚠️ Read this first
 
@@ -104,13 +137,7 @@ chat with anyone else. Favourites let `@jan hi` work before Jan has written. His
 WhatsApp replays on link/reconnect is never relayed: nothing sent before the first link,
 and nothing older than `relay.max_age_s` (6 h).
 
-**SOS buttons.** Radios running [ThinkNode SOS](https://github.com/veld-mesh/thinknode-sos)
-send `🆘 SOS <name>! lat,lon <maps link>` on the channel every 2 min until
-`✅ SOS <name> cancelled`. When the gateway hears one from any node, the bridge WhatsApps
-everyone ticked under **🆘 SOS alerts** on the admin page. Only WhatsApp contacts and
-groups can be ticked. It sends the first alert at once, then at most one location update
-every 10 min, then the cancel. Each send confirms on your node as `✓ SOS Thabo`. With
-nobody ticked, your node gets `⚠ SOS heard, no WhatsApp SOS recipients set`.
+**SOS alerts** need no commands. See [SOS: a panic button that reaches WhatsApp](#-sos-a-panic-button-that-reaches-whatsapp).
 
 ## Admin page
 
