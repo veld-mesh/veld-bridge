@@ -17,6 +17,9 @@ LoRa radio carries your messages out into the field:
   the people and groups you choose get a WhatsApp alert with a map link. They get location
   updates every 10 min and a message when it's cancelled. Nobody on the receiving end
   needs a radio or an app.
+- **Voice notes as text, in English.** Voice notes are transcribed on the box at the
+  house, and Afrikaans (or any other language) is **translated to English**:
+  `#4 Sam: [voice 0:42 af] The cows are out at the bottom gate`. Nothing leaves the house.
 - **Knows when you're on your phone.** Read or send a WhatsApp on your phone and the
   bridge stops duplicating messages to the radio until you've been off it for 30 min.
 
@@ -126,6 +129,20 @@ DM these to the gateway node from your pocket node:
 Incoming messages look like `#3 Sam: see you at 5`. Media shows as `[photo] caption`,
 `[voice 0:42]`, `[pdf: name]` or `[loc] lat,lon`. A long message is cut off with `…`.
 Send `r 3` to get all of it.
+
+**Voice notes** are transcribed locally with
+[faster-whisper](https://github.com/SYSTRAN/faster-whisper) and **translated to English**:
+`#4 Sam: [voice 0:42 af] The cows are out at the bottom gate`. English ones have no
+language tag. Turn it on with `transcription.backend: whisper` (default `none`). The first
+start downloads the multilingual *small* model (~500 MB) into `transcription.model_dir`.
+
+- **Speed:** on a 4-core Celeron NAS it takes about 20–25 s per half-minute of audio. A
+  voice note waits until its text is ready while everything else carries on.
+- **Fallbacks:** if it fails, takes longer than `transcription.timeout_s`, or is longer
+  than `transcription.max_duration_s` (5 min), it goes out as `[voice 0:42]`.
+- **Privacy:** the audio is deleted as soon as it's used. Nothing is sent anywhere.
+- **Languages:** English and Afrikaans work well. isiXhosa and isiZulu are weak in
+  every current speech model, local or cloud.
 
 When you come back into range, you get `5 waiting: Sam×2, Alex, Jo, Kim — r to read`
 first. Then up to 10 messages arrive, oldest first, one every 10 s. If there are more,
@@ -270,6 +287,7 @@ socket and a fake `Client`. `veldbridge --fake-mesh` runs the real process with 
 | `core/src/veldbridge/mesh_serial.py` | gateway adapter + serial watchdog |
 | `core/src/veldbridge/wa_socket.py` | NDJSON socket server for `wa/` |
 | `core/src/veldbridge/admin.py` | admin page API |
+| `core/src/veldbridge/transcribe.py` | local voice-note transcription/translation (faster-whisper) |
 | `wa/src/adapter.js` | whatsapp-web.js lifecycle, watchdog, requests |
 
 ## Licence

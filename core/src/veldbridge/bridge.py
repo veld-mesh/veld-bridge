@@ -2,6 +2,7 @@
 
 Inputs:  on_wa_message / on_wa_state / on_wa_result / on_wa_contacts   (from wa/)
          on_wa_chat_read / on_wa_own    (owner using WhatsApp on their phone -> pause relay)
+         on_transcript                  (a voice note came back as English text)
          on_mesh_packet / on_mesh_ack                                  (from the T-Beam)
          (channel texts starting 🆘 / ✅ from any node -> WhatsApp SOS alerts)
          tick()                                                        (timers)
@@ -32,6 +33,7 @@ from .text import (
     media_label,
     truncate,
 )
+from .transcribe import NullTranscriber, Transcriber
 from .transports import Clock, Mesh, WhatsApp
 
 log = logging.getLogger(__name__)
@@ -66,8 +68,12 @@ class Probe:
 
 
 class Bridge:
-    def __init__(self, cfg: Config, store: Store, mesh: Mesh, wa: WhatsApp, clock: Clock):
+    def __init__(self, cfg: Config, store: Store, mesh: Mesh, wa: WhatsApp, clock: Clock,
+                 transcriber: Transcriber | None = None):
         self.cfg = cfg
+        self.transcriber: Transcriber = transcriber or NullTranscriber(cfg.transcription.audio_dir)
+        # voice notes held back while they're transcribed: message id -> when submitted
+        self._transcribing: dict[int, float] = {}
         self.store = store
         self.wa = wa
         self.clock = clock
@@ -151,15 +157,18 @@ class Bridge:
 
     def on_wa_message(self, m: dict) -> Message | None:
         chat_id = m["chatId"]
+        audio = m.get("audioPath") if isinstance(m.get("audioPath"), str) else None
         is_group = bool(m.get("isGroup")) or chat_id.endswith("@g.us")
         aliases = tuple(a for a in (m.get("aliases") or ()) if isinstance(a, str))
         if m.get("fromMe") or not self.wants(chat_id, is_group, aliases):
             if not is_group:
                 log.info("wa not relayed (filter) from %s", chat_id)
+            self.transcriber.discard(audio)
             return None
         now = self.clock.now()
         if self._stale(m.get("timestamp"), now):
             log.info("wa skipped old message from %s", chat_id)
+            self.transcriber.discard(audio)
             return None
         person = clean(m.get("senderName") or m.get("pushname") or "") or \
             self.store.contact_name(m.get("author") or chat_id) or chat_id.split("@")[0]
@@ -178,12 +187,64 @@ class Bridge:
             media_label=label, received_at=now,
         )
         if msg is None:
+            self.transcriber.discard(audio)
             return None
         log.info("wa in #%s from %s", msg.short_id, chat_id)
         log.debug("wa body #%s: %r", msg.short_id, msg.text)
+        if self._transcribe(msg, audio, m.get("duration")):
+            return msg  # goes out when the text is back (or on timeout)
         if self._live():
             self._send_compact(msg)
         return msg
+
+    # =====================================================================
+    # voice notes -> English text
+    # =====================================================================
+
+    def _transcribe(self, msg: Message, audio: str | None, duration: float | None) -> bool:
+        """Hand a voice note to the transcriber and hold it back. False = relay as is."""
+        if not audio:
+            return False
+        tc = self.cfg.transcription
+        if (tc.backend == "none" or msg.media_kind not in ("voice", "audio")
+                or (duration or 0) > tc.max_duration_s):
+            self.transcriber.discard(audio)
+            return False
+        self._transcribing[msg.id] = self.clock.now()
+        self.transcriber.submit(msg.id, audio)
+        return True
+
+    def on_transcript(self, message_id: int, text: str | None, lang: str | None = None,
+                      error: str | None = None) -> None:
+        """The transcriber is done with a voice note (text None = failed)."""
+        if self._transcribing.pop(message_id, None) is None:
+            return  # timed out: it already went out without text
+        msg = self.store.message(message_id)
+        if msg is None or msg.state != "queued":
+            return  # e.g. the owner listened to it on their phone meanwhile
+        if text:
+            label = msg.media_label or "[voice]"
+            # Whisper often hears Afrikaans as Dutch; on a South African farm it's Afrikaans.
+            lang = {"nl": "af"}.get(lang or "", lang)
+            if lang and lang != "en" and label.endswith("]"):
+                label = f"{label[:-1]} {lang}]"
+            self.store.set_message_body(msg.id, text, label)
+            msg = self.store.message(msg.id)
+        elif error:
+            log.info("voice #%s goes out without text (%s)", msg.short_id, error)
+        if msg is not None and self._live():
+            self._send_compact(msg)
+
+    def _expire_transcriptions(self) -> None:
+        now = self.clock.now()
+        for mid, started in list(self._transcribing.items()):
+            if now - started >= self.cfg.transcription.timeout_s:
+                log.warning("voice note %d not transcribed in time, sending without text", mid)
+                self.on_transcript(mid, None, None, "timeout")
+
+    def _queued(self) -> list[Message]:
+        """Waiting for the mesh, minus voice notes still being transcribed."""
+        return [m for m in self.store.queued() if m.id not in self._transcribing]
 
     def _stale(self, sent_at: float | None, now: float) -> bool:
         """Replayed history: sent before the first link, or older than max_age_s."""
@@ -267,7 +328,7 @@ class Bridge:
         """Node just became reachable: digest, then oldest-first up to the cap."""
         now = self.clock.now()
         self.last_flush_at = now
-        queued = self.store.queued()
+        queued = self._queued()
         if not queued:
             self.held = False
             return
@@ -453,7 +514,7 @@ class Bridge:
             case C.Reply():
                 self._cmd_reply(cmd, packet_id)
             case C.ListWaiting():
-                q = self.store.queued()
+                q = self._queued()
                 items = [f"#{m.short_id} {first_name(clean(m.sender_name))}" for m in q]
                 self.say(fit_list(f"{len(q)} waiting: ", items, "", self.budget)
                          if q else "0 waiting")
@@ -473,7 +534,7 @@ class Bridge:
             case C.Pause(on=on):
                 self.set_paused(on)
                 self.say("⏸ paused: WhatsApp stays on your phone. resume to restart" if on
-                         else f"▶ resumed, {len(self.store.queued())} waiting")
+                         else f"▶ resumed, {len(self._queued())} waiting")
             case C.Invalid(message=m):
                 self.say(m)
 
@@ -489,7 +550,7 @@ class Bridge:
                 return
             msg = self.store.latest_from_chat(hit[0])
         else:
-            queued = self.store.queued()
+            queued = self._queued()
             if not queued:
                 self.held = False
                 return self.say("0 waiting")
@@ -502,7 +563,7 @@ class Bridge:
         self.store.set_message_state(msg.id, "sent")
         for part in parts:
             self.outbox.enqueue(part, Prio.READ, ref)
-        if self.held and len(self.store.queued()) == 0:
+        if self.held and len(self._queued()) == 0:
             self.held = False
 
     def _cmd_reply(self, cmd: C.Reply, packet_id: int | None) -> None:
@@ -531,7 +592,7 @@ class Bridge:
 
     def status_line(self) -> str:
         wa = {"CONNECTED": "ok", "QR": "needs QR"}.get(self.wa_state, "offline")
-        q = len(self.store.queued())
+        q = len(self._queued())
         rtt = self.outbox.last_rtt
         up = _dur(self.clock.now() - self.started_at)
         heard = "never" if self.last_heard is None else _dur(self.clock.now() - self.last_heard)
@@ -668,6 +729,7 @@ class Bridge:
 
     def tick(self) -> None:
         self._wa_alert()
+        self._expire_transcriptions()
         paused = self.paused() is not None
         if (self._was_paused and not paused and self.reachable()
                 and not self.held and not self._flushing()):
@@ -680,7 +742,7 @@ class Bridge:
 
     def _schedule_queue(self) -> None:
         now = self.clock.now()
-        if self.held or self._flushing() or not self.store.queued() or self.paused():
+        if self.held or self._flushing() or not self._queued() or self.paused():
             return
         interval = self.cfg.mesh.probe_interval_s
         if self.reachable():
@@ -690,7 +752,7 @@ class Bridge:
         elif (self.last_probe_at is None or now - self.last_probe_at >= interval) \
                 and not self.outbox.active(Prio.PROBE):
             self.last_probe_at = now
-            self.outbox.enqueue(self.digest(self.store.queued()), Prio.PROBE,
+            self.outbox.enqueue(self.digest(self._queued()), Prio.PROBE,
                                 Probe(), retries=False)
 
     def health(self) -> dict:

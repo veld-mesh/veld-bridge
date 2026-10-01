@@ -14,6 +14,9 @@ dependencies = [
 [project.optional-dependencies]
 # The real mesh adapter. Kept optional so CI and tests never need it.
 mesh = ["meshtastic>=2.7.11,<2.8"]
+# Local voice-note transcription/translation. Optional for the same reason.
+# av 19 dropped open(metadata_errors=...), which faster-whisper 1.2 still passes.
+voice = ["faster-whisper>=1.1,<2", "av<19"]
 dev = ["pytest>=8", "ruff>=0.6"]
 
 [project.scripts]

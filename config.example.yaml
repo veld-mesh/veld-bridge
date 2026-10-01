@@ -30,7 +30,13 @@ whatsapp:
   signature: null             # e.g. " -L (via mesh)"
 
 transcription:
-  backend: none               # voice notes go out as [voice 0:42]
+  backend: none               # none: [voice 0:42] | whisper: local, needs core[voice]
+  # model: small              # base = faster, medium = too slow for a NAS CPU
+  # translate: true           # Afrikaans (or anything) comes out in English
+  # max_duration_s: 300       # longer voice notes aren't transcribed
+  # timeout_s: 300            # send as [voice 0:42] if the text isn't back by then
+  # audio_dir: /var/lib/veld-bridge/voice      # = VB_VOICE_DIR in wa.env
+  # model_dir: /var/lib/veld-bridge/models     # ~500 MB download on first start
 
 health:
   host: 0.0.0.0               # LAN only; nothing is forwarded from the internet

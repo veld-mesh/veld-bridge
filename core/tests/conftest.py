@@ -5,6 +5,7 @@ import pytest
 from veldbridge.bridge import Bridge
 from veldbridge.config import from_dict
 from veldbridge.db import Store
+from veldbridge.transcribe import FakeTranscriber
 from veldbridge.transports import FakeClock, FakeMesh, FakeWhatsApp
 
 POCKET = 0xA1B2C3D4
@@ -22,7 +23,9 @@ class Harness:
         self.mesh = FakeMesh()
         self.wa = FakeWhatsApp()
         self.store = Store()
-        self.bridge = Bridge(self.cfg, self.store, self.mesh, self.wa, self.clock)
+        self.transcriber = FakeTranscriber()
+        self.bridge = Bridge(self.cfg, self.store, self.mesh, self.wa, self.clock,
+                             transcriber=self.transcriber)
         self._wa_ids = itertools.count(1)
         self._pkt_ids = itertools.count(5000)
 

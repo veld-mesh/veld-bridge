@@ -68,7 +68,18 @@ class WhatsAppConfig:
 
 @dataclass(frozen=True)
 class TranscriptionConfig:
+    # "none": voice notes go out as [voice 0:42]. "whisper": local faster-whisper (core[voice]).
     backend: str = "none"
+    model: str = "small"            # multilingual; "base" is faster, "medium" too slow on a NAS CPU
+    translate: bool = True          # everything comes out in English (Afrikaans included)
+    compute_type: str = "int8"
+    cpu_threads: int = 0            # 0 = all cores
+    beam_size: int = 1              # greedy: much faster on a small CPU, little worse
+    max_duration_s: float = 300.0   # longer voice notes aren't transcribed
+    timeout_s: float = 300.0        # send untranscribed if it takes longer than this
+    # Where wa/ drops voice notes (VB_VOICE_DIR on that side) and where models are kept.
+    audio_dir: str = "/var/lib/veld-bridge/voice"
+    model_dir: str = "/var/lib/veld-bridge/models"
 
 
 @dataclass(frozen=True)
@@ -156,8 +167,8 @@ def validate(cfg: Config) -> Config:
     pw = cfg.health.admin_password
     if pw is not None and (not isinstance(pw, str) or len(pw) < 8):
         raise ConfigError("health.admin_password must be at least 8 characters")
-    if cfg.transcription.backend != "none":
-        raise ConfigError("transcription.backend: only 'none' is implemented in v1")
+    if cfg.transcription.backend not in ("none", "whisper"):
+        raise ConfigError("transcription.backend must be 'none' or 'whisper'")
     return cfg
 
 

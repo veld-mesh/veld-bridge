@@ -121,6 +121,10 @@ class Store:
         sql = f"UPDATE messages SET state=?{', ' + cols if cols else ''} WHERE id=?"
         self.conn.execute(sql, (state, *ts.values(), id))
 
+    def set_message_body(self, id: int, text: str, media_label: str | None) -> None:
+        self.conn.execute("UPDATE messages SET text=?, media_label=? WHERE id=?",
+                          (text, media_label, id))
+
     def drop_queued_for_chat(self, chat_id: str) -> int:
         """Read elsewhere: nothing still waiting from this chat goes on air."""
         cur = self.conn.execute(

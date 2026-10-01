@@ -73,6 +73,7 @@ function makeAdapter(opts = {}) {
     },
     link, log: quiet, rebuildDelayMs: 10, readyTimeoutMs: opts.readyTimeoutMs ?? 10_000,
     killChildren: async () => { killed++; },
+    voiceDir: opts.voiceDir ?? null,
   });
   return adapter;
 }
@@ -110,6 +111,29 @@ test('inbound message is normalised; status/fromMe dropped', async () => {
   assert.equal(msgs.length, 1);
   assert.equal(msgs[0].id, 'A');
   assert.equal(msgs[0].senderName, 'Sam');
+});
+
+test('voice note is saved for core to transcribe; a failed download still relays it', async () => {
+  const voiceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vbvoice-'));
+  await makeAdapter({ voiceDir }).start();
+  await tick();
+  const base = { getContact: async () => ({ name: 'Sam' }), getChat: async () => null,
+    from: '1@c.us', type: 'ptt', duration: '7' };
+  clients[0].emit('message', { ...base, id: { $1: 'false_1@c.us_V1' },
+    downloadMedia: async () => ({ mimetype: 'audio/ogg', data: Buffer.from('OggS-audio').toString('base64') }) });
+  clients[0].emit('message', { ...base, id: 'V2', downloadMedia: async () => { throw new Error('gone'); } });
+  await tick(50);
+  // Saving the file takes longer than the failed download, so don't rely on order.
+  const byId = Object.fromEntries(core.of('message').map((m) => [m.id, m]));
+  const ok = byId['false_1@c.us_V1'];
+  const failed = byId.V2;
+  assert.equal(ok.kind, 'voice');
+  assert.equal(ok.duration, 7);
+  assert.equal(path.dirname(ok.audioPath), voiceDir);
+  assert.match(path.basename(ok.audioPath), /^false_1_c_us_V1\.ogg$/);
+  assert.equal(fs.readFileSync(ok.audioPath, 'utf8'), 'OggS-audio');
+  assert.equal(failed.id, 'V2');
+  assert.equal(failed.audioPath, undefined);
 });
 
 test('chat read on another device -> chatRead to core, only at zero unread', async () => {

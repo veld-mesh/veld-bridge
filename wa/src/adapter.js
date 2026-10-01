@@ -5,6 +5,8 @@
 // - "not ready within N min" watchdog (known upstream hang) -> rebuild;
 // - kill leftover Chromium children before re-init;
 // - send with { sendSeen: false }; mark seen only when core asks.
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { contactSummary, normalize, serializeId, shouldDrop } from './protocol.js';
 
 export class Adapter {
@@ -17,7 +19,11 @@ export class Adapter {
     killChildren = async () => {},
     onQr = async () => {},
     onReady = async () => {},
+    voiceDir = null,                 // save voice notes here for core to transcribe; null = off
+    maxVoiceBytes = 16 * 1024 * 1024,
   }) {
+    this.voiceDir = voiceDir;
+    this.maxVoiceBytes = maxVoiceBytes;
     this.clientFactory = clientFactory;
     this.link = link;
     this.log = log;
@@ -189,9 +195,30 @@ export class Adapter {
       ]);
       const out = normalize(msg, contact, chat);
       if (!out.isGroup) out.aliases = await this.#aliases(chatId);
+      if (out.kind === 'voice' && this.voiceDir) {
+        const file = await this.#saveVoice(msg, out.id);
+        if (file) out.audioPath = file;
+      }
       this.link.send(out);
     } catch (e) {
       this.log.warn?.(`dropping inbound message: ${e.message}`);
+    }
+  }
+
+  // Voice note -> file under voiceDir. Core transcribes it (or not) and deletes it.
+  async #saveVoice(msg, id) {
+    try {
+      const media = await msg.downloadMedia();
+      if (!media?.data) return null;
+      const buf = Buffer.from(media.data, 'base64');
+      if (buf.length > this.maxVoiceBytes) return null;
+      const name = `${String(id).replace(/[^A-Za-z0-9_-]/g, '_').slice(-80)}.ogg`;
+      const file = path.join(this.voiceDir, name);
+      await fs.writeFile(file, buf, { mode: 0o600 });
+      return file;
+    } catch (e) {
+      this.log.warn?.(`voice note not saved: ${e.message}`);
+      return null;
     }
   }
 

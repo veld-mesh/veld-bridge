@@ -101,6 +101,12 @@ async def run(cfg: config_mod.Config, fake_mesh: bool) -> None:
     wa = WaSocketServer(cfg.whatsapp.socket_path, None)
     bridge = Bridge(cfg, store, late_mesh, wa, SystemClock())
     wa.bridge = bridge
+    if cfg.transcription.backend == "whisper":
+        from .transcribe import WhisperTranscriber
+
+        bridge.transcriber = WhisperTranscriber(cfg.transcription, loop, bridge.on_transcript)
+        log.info("voice notes: local whisper (%s, %s)", cfg.transcription.model,
+                 "translated to English" if cfg.transcription.translate else "as spoken")
 
     if fake_mesh:
         from .transports import FakeMesh

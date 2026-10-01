@@ -13,6 +13,8 @@ const cfg = {
   sessionDir: env.VB_SESSION_DIR ?? '/var/lib/veld-bridge/wa-session',
   chromium: env.VB_CHROMIUM ?? '/usr/bin/chromium',
   qrPng: env.VB_QR_PNG ?? '/var/lib/veld-bridge/qr.png',
+  // Voice notes for core to transcribe; empty = don't save them.
+  voiceDir: env.VB_VOICE_DIR ?? '/var/lib/veld-bridge/voice',
   readyTimeoutMs: Number(env.VB_READY_TIMEOUT_MIN ?? 5) * 60_000,
   // Pin WA Web: set to a version found in <session>/web-cache after first link.
   webVersion: env.WA_WEB_VERSION || undefined,
@@ -31,6 +33,7 @@ const log = {
 // Session holds WhatsApp credentials: 0700, outside the repo, never logged.
 fs.mkdirSync(cfg.sessionDir, { recursive: true, mode: 0o700 });
 fs.chmodSync(cfg.sessionDir, 0o700);
+if (cfg.voiceDir) fs.mkdirSync(cfg.voiceDir, { recursive: true, mode: 0o700 });
 
 const { default: wweb } = await import('whatsapp-web.js');
 const { Client, LocalAuth } = wweb;
@@ -87,6 +90,7 @@ async function onReady(client) {
 const link = new CoreLink(cfg.socket, { log });
 const adapter = new Adapter({
   clientFactory, link, log, readyTimeoutMs: cfg.readyTimeoutMs, killChildren, onQr, onReady,
+  voiceDir: cfg.voiceDir || null,
 });
 
 for (const sig of ['SIGINT', 'SIGTERM']) {
