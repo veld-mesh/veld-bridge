@@ -143,3 +143,36 @@ def test_status_and_health_show_the_pause():
     h.dm("pause")
     assert h.bridge.health()["paused"] == "manual"
     assert h.bridge.status_line().endswith("paused (manual)")
+
+
+def test_any_command_from_the_node_ends_a_phone_pause_and_delivers():
+    h = live()
+    h.bridge.on_wa_own(JO, timestamp=h.clock.now())   # sent a WhatsApp, then headed out
+    h.wa_msg(chat=SAM, body="are you coming?")
+    h.drain(60)
+    assert relayed(h) == []
+    h.dm("ping")                                       # from the field, 15 min later
+    h.drain(120)
+    assert any(t.startswith("pong") for t in h.air())
+    assert any(t.startswith("#1 Sam Smith: are you coming?") for t in relayed(h))
+    assert h.bridge.paused() is None
+
+
+def test_a_command_does_not_undo_a_manual_pause():
+    h = live()
+    h.dm("pause")
+    h.wa_msg(chat=SAM, body="hold this")
+    h.dm("s")
+    h.drain(120)
+    assert h.bridge.paused() == "manual"
+    assert relayed(h) == []
+
+
+def test_r_during_a_phone_pause_reads_in_full_then_the_rest_follow():
+    h = live()
+    h.bridge.on_wa_own(JO, timestamp=h.clock.now())
+    h.wa_msg(chat=SAM, body="first one")
+    h.wa_msg(name="Jo", chat=JO, body="second one")
+    h.dm("r")
+    h.drain(300)
+    assert h.air() == ["#1 Sam Smith: first one", "#2 Jo: second one"]

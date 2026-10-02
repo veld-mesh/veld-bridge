@@ -164,7 +164,8 @@ them twice. **Phone pause:** reading or sending a WhatsApp on your phone tells t
 you have WhatsApp there. It stops sending new messages to the node until 30 min after your
 last phone activity (`relay.phone_pause_s`, and a switch on the admin page). Then anything
 you haven't read arrives as usual. The bridge's own sends (your mesh replies, SOS alerts)
-don't count. `pause` holds the relay until `resume`, and `resume` also ends a phone pause.
+don't count. Any command you send from the node (`ping`, `r`, `s`, a reply…) ends a phone
+pause, because it shows you're on the radio, and whatever's waiting comes through. `pause` holds the relay until `resume`, and `resume` also ends a phone pause.
 
 **Who you can reply to.** Replies only go to chats that have written to you, or to
 **favourites** (set on the admin page or in `relay.allowlist`). The bridge never starts a

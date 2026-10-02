@@ -293,6 +293,19 @@ class Bridge:
         if not on:
             self.phone_active_at = None  # "resume" means now, phone or not
 
+    def _on_radio(self) -> None:
+        """The owner sent a command from their node: they're on the radio, so a phone pause is over.
+
+        Without this, a WhatsApp sent just before heading out held everything for 30 min
+        even while they were pinging from the field. A manual `pause` is left alone."""
+        was_held = self.phone_pause_left() is not None
+        self.phone_active_at = None
+        if was_held:
+            log.info("command from the node: phone pause over")
+            if (self.paused() is None and self.reachable()
+                    and not self.held and not self._flushing()):
+                self.flush()
+
     def _phone_active(self, why: str) -> None:
         if self.paused() is None and self.phone_pause_on():
             log.info("phone active (%s): holding mesh relay", why)
@@ -372,6 +385,7 @@ class Bridge:
         if cmd is not None:
             log.info("mesh cmd %s", type(cmd).__name__)
             self.handle(cmd, packet_id)
+            self._on_radio()  # after: `r` still reads the next message in full
 
     # =====================================================================
     # SOS -> WhatsApp
